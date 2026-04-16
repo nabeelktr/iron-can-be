@@ -1,21 +1,23 @@
 import { requireAuthAPI, isAuthError } from "./require-auth-api";
 import { NextResponse, type NextRequest } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
-import type { UserProfile } from "@/types/diet";
+import type { UserProfile, UserRole } from "@/types/diet";
 
-interface AdminAuthResult {
+interface RoleAuthResult {
   supabase: SupabaseClient;
   user: User;
   profile: UserProfile;
 }
 
 /**
- * Auth helper that requires the user to have admin role.
- * Returns 403 if the user is not an admin.
+ * Generic role-based auth helper.
+ * Accepts an array of allowed roles and grants access if the user matches any.
+ * Useful for endpoints accessible to multiple roles (e.g., super_admin + trainer).
  */
-export async function requireAdminAPI(
+export async function requireRoleAPI(
   request: NextRequest,
-): Promise<AdminAuthResult | NextResponse> {
+  allowedRoles: UserRole[],
+): Promise<RoleAuthResult | NextResponse> {
   const auth = await requireAuthAPI(request);
   if (isAuthError(auth)) return auth;
   const { supabase, user } = auth;
@@ -30,15 +32,23 @@ export async function requireAdminAPI(
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
-  if (profile.role !== "super_admin") {
+  if (!allowedRoles.includes(profile.role as UserRole)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Additional check: trainers must be approved
+  if (profile.role === "trainer" && profile.trainer_status !== "approved") {
+    return NextResponse.json(
+      { error: "Trainer account not yet approved" },
+      { status: 403 },
+    );
   }
 
   return { supabase, user, profile: profile as UserProfile };
 }
 
-export function isAdminError(
-  result: AdminAuthResult | NextResponse,
+export function isRoleError(
+  result: RoleAuthResult | NextResponse,
 ): result is NextResponse {
   return result instanceof NextResponse;
 }

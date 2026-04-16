@@ -9,7 +9,16 @@ export async function GET(request: NextRequest) {
     const { supabase } = auth;
 
     // Run queries in parallel
-    const [usersResult, pendingResult, plansResult, recentResult] = await Promise.all([
+    const [
+      usersResult,
+      pendingResult,
+      plansResult,
+      recentResult,
+      trainersResult,
+      pendingTrainersResult,
+      basicUsersResult,
+      premiumUsersResult,
+    ] = await Promise.all([
       supabase
         .from("user_profiles")
         .select("id", { count: "exact", head: true })
@@ -28,6 +37,25 @@ export async function GET(request: NextRequest) {
         .eq("role", "user")
         .order("created_at", { ascending: false })
         .limit(10),
+      supabase
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "trainer"),
+      supabase
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "trainer")
+        .eq("trainer_status", "pending"),
+      supabase
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "user")
+        .eq("subscription_tier", "basic"),
+      supabase
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "user")
+        .eq("subscription_tier", "premium"),
     ]);
 
     return NextResponse.json({
@@ -35,6 +63,10 @@ export async function GET(request: NextRequest) {
       pendingApprovals: pendingResult.count ?? 0,
       activeDietPlans: plansResult.count ?? 0,
       recentSignups: recentResult.data ?? [],
+      totalTrainers: trainersResult.count ?? 0,
+      pendingTrainers: pendingTrainersResult.count ?? 0,
+      basicUsers: basicUsersResult.count ?? 0,
+      premiumUsers: premiumUsersResult.count ?? 0,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

@@ -1,7 +1,13 @@
 // ─── User Profile ────────────────────────────────────────────────────────────
 
-export type UserRole = "admin" | "user";
+export type UserRole = "super_admin" | "trainer" | "user";
 export type UserStatus = "pending" | "approved" | "rejected";
+export type SubscriptionTier = "basic" | "premium";
+export type SubscriptionStatus = "inactive" | "active" | "paused" | "cancelled";
+export type TrainerStatus = "pending" | "approved" | "suspended";
+export type TrainerUserStatus = "invited" | "joined" | "rejected" | "removed";
+export type UpgradeRequestStatus = "pending" | "approved" | "rejected" | "completed";
+export type PaymentStatus = "pending" | "completed" | "failed" | "refunded";
 export type Gender = "male" | "female" | "other" | "prefer_not_to_say";
 export type ActivityLevel =
   | "sedentary"
@@ -31,6 +37,15 @@ export interface UserProfile {
   fitness_goal: FitnessGoal | null;
   dietary_preferences: string[] | null;
   onboarding_completed: boolean;
+  subscription_tier: SubscriptionTier;
+  subscription_status: SubscriptionStatus;
+  subscription_started_at: string | null;
+  subscription_ends_at: string | null;
+  assigned_trainer_id: string | null;
+  is_trainer: boolean;
+  trainer_status: TrainerStatus | null;
+  trainer_approved_at: string | null;
+  referral_code: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,6 +98,10 @@ export interface DietPlan {
   target_fat: number | null;
   num_days: number;
   is_active: boolean;
+  created_by_trainer_id: string | null;
+  is_template: boolean;
+  is_public: boolean;
+  tier_required: SubscriptionTier;
   created_at: string;
   updated_at: string;
   days?: DietPlanDay[];
@@ -131,6 +150,8 @@ export interface DietPlanAssignment {
   end_date: string | null;
   status: AssignmentStatus;
   notes: string | null;
+  trainer_id: string | null;
+  can_modify: boolean;
   created_at: string;
   updated_at: string;
   plan?: DietPlan;
