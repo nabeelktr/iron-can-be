@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         plan: { name: string };
       } | null;
 
-      const { error: insertError } = await supabase
+      const { data: newLog, error: insertError } = await supabase
         .from("exercise_logs")
         .insert({
           exercise_id: exerciseId,
@@ -90,18 +90,23 @@ export async function POST(request: NextRequest) {
           completed_reps: setData.reps,
           weight_used: setData.weight,
           sets: [setData],
-        });
+        })
+        .select()
+        .single();
+
       if (insertError)
         return NextResponse.json(
           { error: insertError.message },
           { status: 500 },
         );
+
+      return NextResponse.json(newLog);
     } else {
       // Update existing log with new set
       const sets = existingLog.sets || [];
       sets[setIndex] = setData;
 
-      const { error } = await supabase
+      const { data: updatedLog, error } = await supabase
         .from("exercise_logs")
         .update({
           sets,
@@ -110,9 +115,14 @@ export async function POST(request: NextRequest) {
           weight_used:
             Math.max(...sets.map((s: ExerciseSet) => s.weight ?? 0)) || null,
         })
-        .eq("id", existingLog.id);
+        .eq("id", existingLog.id)
+        .select()
+        .single();
+
       if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });
+
+      return NextResponse.json(updatedLog);
     }
 
     return NextResponse.json({ success: true });
