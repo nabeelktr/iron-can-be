@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
           completed_reps: setData.reps,
           weight_used: setData.weight,
           sets: [setData],
+          updated_at: new Date().toISOString(),
         });
       if (insertError)
         return NextResponse.json(
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
           completed_reps: sets[sets.length - 1].reps,
           weight_used:
             Math.max(...sets.map((s: ExerciseSet) => s.weight ?? 0)) || null,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", existingLog.id);
       if (error)
