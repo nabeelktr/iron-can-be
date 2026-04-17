@@ -2,11 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // POST /api/fitness/auth/signup — create a new account
-// Body: { email: string, password: string, trainer_invite_code?: string }
+// Body: { email: string, password: string, trainer_invite_code?: string, as_trainer?: boolean }
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, trainer_invite_code } = body;
+    const { email, password, trainer_invite_code, as_trainer } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -42,16 +42,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // If trainer invite code is provided, promote the new user to trainer
-    if (trainer_invite_code && data.user) {
+    const shouldPromoteToTrainer = Boolean(as_trainer || trainer_invite_code);
+
+    if (shouldPromoteToTrainer && data.user) {
+      const update: Record<string, unknown> = {
+        role: "trainer",
+        is_trainer: true,
+        trainer_status: "pending",
+      };
+      if (trainer_invite_code) {
+        update.referral_code = String(trainer_invite_code).slice(0, 12);
+      }
       await supabase
         .from("user_profiles")
-        .update({
-          role: "trainer",
-          is_trainer: true,
-          trainer_status: "pending",
-          referral_code: trainer_invite_code.slice(0, 12),
-        })
+        .update(update)
         .eq("user_id", data.user.id);
     }
 
@@ -59,8 +63,9 @@ export async function POST(request: NextRequest) {
       user: data.user
         ? { id: data.user.id, email: data.user.email }
         : null,
-      message: trainer_invite_code
-        ? "Trainer account created. Pending admin approval."
+      role: shouldPromoteToTrainer ? "trainer" : "user",
+      message: shouldPromoteToTrainer
+        ? "Trainer account created. Check your email to confirm, then wait for admin approval."
         : "Check your email for a confirmation link",
     }, { status: 201 });
   } catch (error) {
