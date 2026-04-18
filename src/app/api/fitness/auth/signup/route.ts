@@ -44,19 +44,24 @@ export async function POST(request: NextRequest) {
 
     const shouldPromoteToTrainer = Boolean(as_trainer || trainer_invite_code);
 
-    if (shouldPromoteToTrainer && data.user) {
-      const update: Record<string, unknown> = {
-        role: "trainer",
-        is_trainer: true,
-        trainer_status: "pending",
+    if (data.user) {
+      const profileData: Record<string, unknown> = {
+        user_id: data.user.id,
+        email: email,
+        role: shouldPromoteToTrainer ? "trainer" : "user",
+        is_trainer: shouldPromoteToTrainer,
+        trainer_status: shouldPromoteToTrainer ? "pending" : null,
+        status: shouldPromoteToTrainer ? "pending" : "approved",
+        subscription_tier: "basic",
+        subscription_status: "inactive",
+        onboarding_completed: false,
       };
       if (trainer_invite_code) {
-        update.referral_code = String(trainer_invite_code).slice(0, 12);
+        profileData.referral_code = String(trainer_invite_code).slice(0, 12);
       }
       await supabase
         .from("user_profiles")
-        .update(update)
-        .eq("user_id", data.user.id);
+        .upsert(profileData, { onConflict: "user_id" });
     }
 
     return NextResponse.json({
