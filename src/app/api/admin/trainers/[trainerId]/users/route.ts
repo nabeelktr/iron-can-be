@@ -35,9 +35,12 @@ export async function GET(
     // Get trainer's users via trainer_users join
     const { data: relationships, error, count } = await supabase
       .from("trainer_users")
-      .select("*, user:user_profiles!trainer_users_user_id_fkey(*)", {
-        count: "exact",
-      })
+      .select(
+        "id,trainer_id,user_id,status,tier_assigned,notes,invited_at,joined_at,created_at,updated_at,user:user_profiles!trainer_users_user_id_fkey(id,user_id,email,display_name,assigned_trainer_id)",
+        {
+          count: "exact",
+        },
+      )
       .eq("trainer_id", trainerId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);

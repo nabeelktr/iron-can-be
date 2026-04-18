@@ -28,10 +28,15 @@ ALTER TABLE user_profiles
   ADD COLUMN IF NOT EXISTS trainer_approved_at timestamptz,
   ADD COLUMN IF NOT EXISTS referral_code text UNIQUE;
 
+ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_subscription_tier_check;
 ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_subscription_tier_check
   CHECK (subscription_tier IN ('basic', 'premium'));
+
+ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_subscription_status_check;
 ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_subscription_status_check
   CHECK (subscription_status IN ('inactive', 'active', 'paused', 'cancelled'));
+
+ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_trainer_status_check;
 ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_trainer_status_check
   CHECK (trainer_status IN ('pending', 'approved', 'suspended'));
 
@@ -147,6 +152,7 @@ ALTER TABLE diet_plans
   ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS tier_required text NOT NULL DEFAULT 'premium';
 
+ALTER TABLE diet_plans DROP CONSTRAINT IF EXISTS diet_plans_tier_required_check;
 ALTER TABLE diet_plans ADD CONSTRAINT diet_plans_tier_required_check
   CHECK (tier_required IN ('basic', 'premium'));
 
@@ -177,14 +183,17 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE upgrade_requests ENABLE ROW LEVEL SECURITY;
 
 -- trainer_users policies
+DROP POLICY IF EXISTS "trainers_see_own_users" ON trainer_users;
 CREATE POLICY "trainers_see_own_users" ON trainer_users
   FOR SELECT USING (
     trainer_id IN (SELECT id FROM user_profiles WHERE user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "users_see_own_trainer" ON trainer_users;
 CREATE POLICY "users_see_own_trainer" ON trainer_users
   FOR SELECT USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "trainers_manage_own_users" ON trainer_users;
 CREATE POLICY "trainers_manage_own_users" ON trainer_users
   FOR INSERT WITH CHECK (
     trainer_id IN (
@@ -193,11 +202,13 @@ CREATE POLICY "trainers_manage_own_users" ON trainer_users
     )
   );
 
+DROP POLICY IF EXISTS "trainers_update_own_users" ON trainer_users;
 CREATE POLICY "trainers_update_own_users" ON trainer_users
   FOR UPDATE USING (
     trainer_id IN (SELECT id FROM user_profiles WHERE user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "super_admin_all_trainer_users" ON trainer_users;
 CREATE POLICY "super_admin_all_trainer_users" ON trainer_users
   FOR ALL USING (
     EXISTS (
@@ -207,9 +218,11 @@ CREATE POLICY "super_admin_all_trainer_users" ON trainer_users
   );
 
 -- subscriptions policies
+DROP POLICY IF EXISTS "users_own_subscription" ON subscriptions;
 CREATE POLICY "users_own_subscription" ON subscriptions
   FOR SELECT USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "super_admin_all_subscriptions" ON subscriptions;
 CREATE POLICY "super_admin_all_subscriptions" ON subscriptions
   FOR ALL USING (
     EXISTS (
@@ -219,9 +232,11 @@ CREATE POLICY "super_admin_all_subscriptions" ON subscriptions
   );
 
 -- payments policies
+DROP POLICY IF EXISTS "users_own_payments" ON payments;
 CREATE POLICY "users_own_payments" ON payments
   FOR SELECT USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "super_admin_all_payments" ON payments;
 CREATE POLICY "super_admin_all_payments" ON payments
   FOR ALL USING (
     EXISTS (
@@ -231,14 +246,17 @@ CREATE POLICY "super_admin_all_payments" ON payments
   );
 
 -- upgrade_requests policies
+DROP POLICY IF EXISTS "users_own_upgrade_requests" ON upgrade_requests;
 CREATE POLICY "users_own_upgrade_requests" ON upgrade_requests
   FOR SELECT USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "trainers_see_their_requests" ON upgrade_requests;
 CREATE POLICY "trainers_see_their_requests" ON upgrade_requests
   FOR SELECT USING (
     requested_trainer_id IN (SELECT id FROM user_profiles WHERE user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "super_admin_all_upgrade_requests" ON upgrade_requests;
 CREATE POLICY "super_admin_all_upgrade_requests" ON upgrade_requests
   FOR ALL USING (
     EXISTS (

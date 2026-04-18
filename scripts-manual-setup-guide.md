@@ -70,7 +70,7 @@ SELECT
   tu.joined_at
 FROM trainer_users tu
 JOIN user_profiles t ON tu.trainer_id = t.id
-JOIN auth.users u ON tu.user_id = u.id;
+JOIN user_profiles u ON tu.user_id = u.user_id;
 ```
 
 ## Test Login Flow

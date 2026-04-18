@@ -30,7 +30,7 @@ INSERT INTO user_profiles (
   activity_level,
   fitness_goal
 ) VALUES (
-  'test-client-id'::uuid,        -- Replace with actual UUID from auth.users
+  'f7dfab21-16ad-4ae7-b7b1-6a29b38e7ab6'::uuid,        -- Replace with actual UUID from auth.users
   'client@example.com',           -- Email should match auth.users email
   'John Client',
   'user',
@@ -67,7 +67,7 @@ INSERT INTO user_profiles (
   subscription_tier,
   subscription_status
 ) VALUES (
-  'test-trainer-id'::uuid,       -- Replace with actual UUID from auth.users
+  '8bf71b6f-df33-444e-9b1d-e0946e32a840'::uuid,       -- Replace with actual UUID from auth.users
   'trainer@example.com',          -- Email should match auth.users email
   'Jane Trainer',
   'trainer',
@@ -102,7 +102,7 @@ INSERT INTO user_profiles (
   subscription_tier,
   subscription_status
 ) VALUES (
-  'test-trainer-pending-id'::uuid, -- Replace with actual UUID from auth.users
+  '022e7f4a-a0cc-4361-84d2-d5e5da3a8d66'::uuid, -- Replace with actual UUID from auth.users
   'trainer-pending@example.com',    -- Email should match auth.users email
   'Bob TrainerPending',
   'trainer',
@@ -133,7 +133,7 @@ INSERT INTO trainer_users (
   joined_at
 ) VALUES (
   (SELECT id FROM user_profiles WHERE email = 'trainer@example.com'),
-  'test-client-id'::uuid,
+  (SELECT user_id FROM user_profiles WHERE email = 'client@example.com'),
   'joined',
   'basic',
   now()
@@ -160,4 +160,4 @@ COMMIT;
 --   tu.joined_at
 -- FROM trainer_users tu
 -- JOIN user_profiles t ON tu.trainer_id = t.id
--- JOIN auth.users u ON tu.user_id = u.id;
+-- JOIN user_profiles u ON tu.user_id = u.user_id;
