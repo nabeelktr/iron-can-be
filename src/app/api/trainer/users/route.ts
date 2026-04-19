@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("trainer_users")
-      .select("*, user:user_profiles!trainer_users_user_id_fkey(*)", {
+      .select("*", {
         count: "exact",
       })
       .eq("trainer_id", profile.id)
@@ -31,13 +31,34 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", status);
     }
 
-    const { data: users, error, count } = await query;
+    const { data: relationships, error, count } = await query;
 
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
 
+    // Fetch user profiles separately
+    const userIds = (relationships ?? [])
+      .map((r) => r.user_id as string)
+      .filter(Boolean);
+
+    let profileMap = new Map();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("user_id, email, display_name")
+        .in("user_id", userIds);
+
+      profileMap = new Map(
+        (profiles ?? []).map((p) => [p.user_id, p])
+      );
+    }
+
     // If search is provided, filter on the joined user profile fields
-    let filtered = users ?? [];
+    let filtered = (relationships ?? []).map((r) => ({
+      ...r,
+      user: profileMap.get(r.user_id) || null,
+    }));
+
     if (search) {
       const lower = search.toLowerCase();
       filtered = filtered.filter(
