@@ -35,12 +35,9 @@ export async function GET(
     // Get trainer's users via trainer_users join
     const { data: relationships, error, count } = await supabase
       .from("trainer_users")
-      .select(
-        "id,trainer_id,user_id,status,tier_assigned,notes,invited_at,joined_at,created_at,updated_at,user:user_profiles!trainer_users_user_id_fkey(id,user_id,email,display_name,assigned_trainer_id)",
-        {
-          count: "exact",
-        },
-      )
+      .select("id,trainer_id,user_id,status,tier_assigned,notes,invited_at,joined_at,created_at,updated_at", {
+        count: "exact",
+      })
       .eq("trainer_id", trainerId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -48,9 +45,27 @@ export async function GET(
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
 
+    // Fetch user profiles for the relationships
+    let users = relationships ?? [];
+    if (users.length > 0) {
+      const userIds = users.map((r) => r.user_id);
+      const { data: profiles, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("id, user_id, email, display_name, assigned_trainer_id")
+        .in("user_id", userIds);
+
+      if (!profileError && profiles) {
+        const profileMap = new Map(profiles.map((p) => [p.user_id, p]));
+        users = users.map((r) => ({
+          ...r,
+          user: profileMap.get(r.user_id) ?? null,
+        }));
+      }
+    }
+
     return NextResponse.json({
       trainer,
-      users: relationships ?? [],
+      users,
       total: count ?? 0,
       page,
       limit,
