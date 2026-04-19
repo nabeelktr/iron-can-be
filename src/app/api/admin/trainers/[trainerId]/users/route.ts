@@ -46,7 +46,10 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
 
     // Fetch user profiles for the relationships
-    let users = (relationships ?? []).map((r) => ({
+    type UserWithProfile = typeof relationships[number] & {
+      user: { id: any; user_id: any; email: any; display_name: any; assigned_trainer_id: any } | null;
+    };
+    let users: UserWithProfile[] = (relationships ?? []).map((r) => ({
       ...r,
       user: null,
     }));
