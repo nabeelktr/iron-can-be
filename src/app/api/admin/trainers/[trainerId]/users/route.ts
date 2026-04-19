@@ -46,20 +46,36 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
 
     // Fetch user profiles for the relationships
-    let users = relationships ?? [];
-    if (users.length > 0) {
-      const userIds = users.map((r) => r.user_id);
-      const { data: profiles, error: profileError } = await supabase
-        .from("user_profiles")
-        .select("id, user_id, email, display_name, assigned_trainer_id")
-        .in("user_id", userIds);
+    let users = (relationships ?? []).map((r) => ({
+      ...r,
+      user: null,
+    }));
 
-      if (!profileError && profiles) {
-        const profileMap = new Map(profiles.map((p) => [p.user_id, p]));
-        users = users.map((r) => ({
-          ...r,
-          user: profileMap.get(r.user_id) ?? null,
-        }));
+    if (users.length > 0) {
+      const userIds = users.map((r) => r.user_id).filter(Boolean);
+      console.log("[GET trainer users] Found relationships:", {
+        count: users.length,
+        userIds,
+      });
+
+      if (userIds.length > 0) {
+        const { data: profiles, error: profileError } = await supabase
+          .from("user_profiles")
+          .select("id, user_id, email, display_name, assigned_trainer_id")
+          .in("user_id", userIds);
+
+        console.log("[GET trainer users] Profile lookup:", {
+          found: profiles?.length ?? 0,
+          error: profileError?.message,
+        });
+
+        if (profiles && profiles.length > 0) {
+          const profileMap = new Map(profiles.map((p) => [p.user_id, p]));
+          users = users.map((r) => ({
+            ...r,
+            user: profileMap.get(r.user_id) || null,
+          }));
+        }
       }
     }
 
