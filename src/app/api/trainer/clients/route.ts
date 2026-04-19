@@ -61,10 +61,10 @@ export async function GET(request: NextRequest) {
     const flagFilter = searchParams.get("flag") as ClientFlag;
     const sort = searchParams.get("sort") || "recent";
 
-    // 1. Get trainer's joined clients + their user profile
+    // 1. Get trainer's joined clients
     const { data: relationships, error: relError } = await supabase
       .from("trainer_users")
-      .select("user_id, status, joined_at, user:user_profiles!trainer_users_user_id_fkey(user_id, display_name, email)")
+      .select("user_id, status, joined_at")
       .eq("trainer_id", profile.id)
       .eq("status", "joined");
 
@@ -78,6 +78,19 @@ export async function GET(request: NextRequest) {
     if (userIds.length === 0) {
       return NextResponse.json({ clients: [], total: 0 });
     }
+
+    // Fetch user profiles for these users
+    const { data: profiles, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("user_id, display_name, email")
+      .in("user_id", userIds);
+
+    if (profileError)
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
+
+    const profileMap = new Map(
+      (profiles ?? []).map((p) => [p.user_id, p])
+    );
 
     const todayIso = new Date().toISOString().split("T")[0];
     const since = new Date();
@@ -149,7 +162,7 @@ export async function GET(request: NextRequest) {
     const clients: ClientRow[] = [];
     for (const rel of relationships ?? []) {
       const userId = rel.user_id as string;
-      const userProfile = Array.isArray(rel.user) ? rel.user[0] : rel.user;
+      const userProfile = profileMap.get(userId);
       const assignment = assignmentByUser.get(userId) ?? null;
       const userLogs = logsByUser.get(userId) ?? [];
 
