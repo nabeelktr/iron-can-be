@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const { supabase, user } = auth;
 
     const body = await request.json();
-    const { food_id, meal_type, quantity, serving_unit, notes, is_planned, date } = body;
+    const { food_id, meal_type, quantity, serving_unit, notes, is_planned, is_consumed, date } = body;
 
     if (!food_id || !meal_type) {
       return NextResponse.json(
@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
         quantity: quantity ?? 1,
         serving_unit: serving_unit || null,
         is_planned: is_planned ?? false,
+        is_consumed: is_consumed ?? true,
         notes: notes || null,
       })
       .select("id")

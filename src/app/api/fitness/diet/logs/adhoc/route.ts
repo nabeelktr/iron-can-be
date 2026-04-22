@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       notes,
       external_source,
       external_id,
+      is_consumed,
     } = body as {
       date?: string;
       meal_type?: string;
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       notes?: string;
       external_source?: "openfoodfacts" | "nutritionix" | "usda" | "manual";
       external_id?: string;
+      is_consumed?: boolean;
     };
 
     if (!meal_type || !VALID_MEAL_TYPES.includes(meal_type)) {
@@ -105,6 +107,7 @@ export async function POST(request: NextRequest) {
         quantity: Number(quantity ?? 1),
         serving_unit: serving_unit ?? snapshot.serving_unit,
         is_planned: false,
+        is_consumed: is_consumed ?? true,
         notes: notes ?? null,
       })
       .select()

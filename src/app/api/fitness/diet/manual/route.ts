@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { date, meal_type, food_name, calories, protein_g, carbs_g, fat_g, quantity, serving_unit, notes } = body;
+    const { date, meal_type, food_name, calories, protein_g, carbs_g, fat_g, quantity, serving_unit, notes, is_consumed } = body;
 
     if (!meal_type || !food_name || calories == null) {
       return NextResponse.json(
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
         quantity: Number(quantity || 1),
         serving_unit: serving_unit || "serving",
         is_planned: false,
+        is_consumed: is_consumed ?? true,
         notes: notes || null,
       })
       .select()

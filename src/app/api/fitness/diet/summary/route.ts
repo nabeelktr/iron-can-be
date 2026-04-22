@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
     let totalFiber = 0;
 
     for (const log of logs ?? []) {
+      if (log.is_consumed === false) continue;
+
       const snap = log.food_snapshot as {
         calories: number;
         protein_g: number;
@@ -82,10 +84,11 @@ export async function GET(request: NextRequest) {
             plannedItems++;
             // Check if user has logged this specific food for this meal type
             const logged = (logs ?? []).find(
-              (log: { food_id: string | null; meal_type: string; is_planned: boolean }) =>
+              (log: { food_id: string | null; meal_type: string; is_planned: boolean; is_consumed: boolean }) =>
                 log.food_id === item.food_id &&
                 log.meal_type === meal.meal_type &&
-                log.is_planned === true,
+                log.is_planned === true &&
+                log.is_consumed !== false,
             );
             if (logged) loggedPlannedItems++;
           }

@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS diet_logs (
   quantity        numeric(7,2) NOT NULL DEFAULT 1,
   serving_unit    text,
   is_planned      boolean NOT NULL DEFAULT false,
+  is_consumed     boolean NOT NULL DEFAULT true,
   notes           text,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
