@@ -65,12 +65,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: assignment } = await supabase
-      .from("diet_plan_assignments")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .maybeSingle();
+    // Defensive assignment lookup — proceed with null if RLS blocks or query fails
+    let assignmentId: string | null = null;
+    try {
+      const { data: assignmentData } = await supabase
+        .from("diet_plan_assignments")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle();
+      assignmentId = assignmentData?.id ?? null;
+    } catch {
+      // non-blocking
+    }
 
     const snapshot = {
       name: food_snapshot.name,
@@ -90,7 +97,7 @@ export async function POST(request: NextRequest) {
       .from("diet_logs")
       .insert({
         user_id: user.id,
-        assignment_id: assignment?.id ?? null,
+        assignment_id: assignmentId,
         date: date || new Date().toISOString().split("T")[0],
         meal_type,
         food_id: null,
