@@ -64,15 +64,37 @@ export async function POST(request: NextRequest) {
 
     const date = body.date || new Date().toISOString().split("T")[0];
 
-    const { data, error } = await supabase
+    // Check if an entry already exists for today
+    const { data: existing } = await supabase
       .from("weight_logs")
-      .insert({
-        user_id: user.id,
-        date,
-        weight_kg: Math.round(weight * 100) / 100,
-      })
-      .select("id, date, weight_kg, created_at")
-      .single();
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("date", date)
+      .maybeSingle();
+
+    let data, error;
+    if (existing) {
+      const res = await supabase
+        .from("weight_logs")
+        .update({ weight_kg: Math.round(weight * 100) / 100 })
+        .eq("id", existing.id)
+        .select("id, date, weight_kg, created_at")
+        .single();
+      data = res.data;
+      error = res.error;
+    } else {
+      const res = await supabase
+        .from("weight_logs")
+        .insert({
+          user_id: user.id,
+          date,
+          weight_kg: Math.round(weight * 100) / 100,
+        })
+        .select("id, date, weight_kg, created_at")
+        .single();
+      data = res.data;
+      error = res.error;
+    }
 
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
