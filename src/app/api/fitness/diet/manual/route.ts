@@ -1,14 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthAPI, isAuthError } from "@/lib/auth/require-auth-api";
 
-// POST /api/fitness/diet/manual — manually add a food entry (premium only)
+const VALID_MEAL_TYPES = [
+  "early_morning",
+  "breakfast",
+  "mid_morning_snack",
+  "lunch",
+  "evening_snack",
+  "dinner",
+  "bedtime",
+  "other",
+];
+
+// POST /api/fitness/diet/manual — premium-only manual food entry.
+//
+// Snapshot rule (shared across diet_logs):
+//   food_snapshot.{calories,protein_g,...} are macros for ONE serving_unit
+//   (= serving_size grams of that unit). diet_logs.quantity is the multiplier.
+//   Summary = snap × quantity. The client MUST send per-serving macros, not
+//   pre-multiplied totals — pre-multiplying caused a quantity² double-count.
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuthAPI(request);
     if (isAuthError(auth)) return auth;
     const { supabase, user } = auth;
 
-    // Check premium tier
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("subscription_tier")
@@ -23,7 +39,22 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { date, meal_type, food_name, calories, protein_g, carbs_g, fat_g, quantity, serving_unit, notes, is_consumed } = body;
+    const {
+      date,
+      meal_type,
+      food_name,
+      brand,
+      calories,
+      protein_g,
+      carbs_g,
+      fat_g,
+      fiber_g,
+      quantity,
+      serving_size,
+      serving_unit,
+      notes,
+      is_consumed,
+    } = body;
 
     if (!meal_type || !food_name || calories == null) {
       return NextResponse.json(
@@ -31,52 +62,49 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-
-    const validMealTypes = [
-      "early_morning", "breakfast", "mid_morning_snack",
-      "lunch", "evening_snack", "dinner", "bedtime", "other",
-    ];
-    if (!validMealTypes.includes(meal_type)) {
-      return NextResponse.json(
-        { error: "Invalid meal_type" },
-        { status: 400 },
-      );
+    if (!VALID_MEAL_TYPES.includes(meal_type)) {
+      return NextResponse.json({ error: "Invalid meal_type" }, { status: 400 });
     }
 
-    // Get active assignment if any
-    const { data: assignment } = await supabase
-      .from("diet_plan_assignments")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .maybeSingle();
+    let assignmentId: string | null = null;
+    try {
+      const { data: assignment } = await supabase
+        .from("diet_plan_assignments")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle();
+      assignmentId = assignment?.id ?? null;
+    } catch {
+      // non-blocking
+    }
 
-    // Create diet log with food_id=NULL (manual entry)
     const foodSnapshot = {
-      name: food_name,
+      name: String(food_name),
+      brand: brand ?? null,
       calories: Number(calories),
-      protein_g: Number(protein_g || 0),
-      carbs_g: Number(carbs_g || 0),
-      fat_g: Number(fat_g || 0),
-      fiber_g: 0,
-      serving_size: Number(quantity || 1),
-      serving_unit: serving_unit || "serving",
+      protein_g: Number(protein_g ?? 0),
+      carbs_g: Number(carbs_g ?? 0),
+      fat_g: Number(fat_g ?? 0),
+      fiber_g: Number(fiber_g ?? 0),
+      serving_size: Number(serving_size ?? 1),
+      serving_unit: String(serving_unit ?? "serving"),
     };
 
     const { data: log, error } = await supabase
       .from("diet_logs")
       .insert({
         user_id: user.id,
-        assignment_id: assignment?.id || null,
+        assignment_id: assignmentId,
         date: date || new Date().toISOString().split("T")[0],
         meal_type,
         food_id: null,
         food_snapshot: foodSnapshot,
-        quantity: Number(quantity || 1),
-        serving_unit: serving_unit || "serving",
+        quantity: Number(quantity ?? 1),
+        serving_unit: String(serving_unit ?? "serving"),
         is_planned: false,
-        is_consumed: is_consumed ?? true,
-        notes: notes || null,
+        is_consumed: is_consumed ?? false,
+        notes: notes ?? null,
       })
       .select()
       .single();

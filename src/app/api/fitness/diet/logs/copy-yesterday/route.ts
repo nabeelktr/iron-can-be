@@ -8,6 +8,7 @@ interface DietLogRow {
   quantity: number | null;
   serving_unit: string | null;
   is_planned: boolean;
+  is_consumed: boolean;
   notes: string | null;
 }
 
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     const { data: sourceLogs, error: fetchErr } = await supabase
       .from("diet_logs")
       .select(
-        "food_id, meal_type, food_snapshot, quantity, serving_unit, is_planned, notes",
+        "food_id, meal_type, food_snapshot, quantity, serving_unit, is_planned, is_consumed, notes",
       )
       .eq("user_id", user.id)
       .eq("date", yesterdayIso)
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
       quantity: r.quantity ?? 1,
       serving_unit: r.serving_unit,
       is_planned: false,
+      is_consumed: r.is_consumed ?? false,
       notes: r.notes,
     }));
 

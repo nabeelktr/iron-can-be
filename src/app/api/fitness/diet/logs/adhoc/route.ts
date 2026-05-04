@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         quantity: Number(quantity ?? 1),
         serving_unit: serving_unit ?? snapshot.serving_unit,
         is_planned: false,
-        is_consumed: is_consumed ?? true,
+        is_consumed: is_consumed ?? false,
         notes: notes ?? null,
       })
       .select()
