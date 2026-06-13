@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthAPI, isAuthError } from "@/lib/auth/require-auth-api";
+import { computeSubscriptionState, downgradePatch } from "@/lib/subscription";
 
 // GET /api/fitness/subscription — get current user's subscription info
 export async function GET(request: NextRequest) {
@@ -24,6 +25,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Derive effective state and lazily downgrade if the subscription lapsed.
+    const state = computeSubscriptionState(profile);
+    if (state.needs_downgrade) {
+      const now = new Date();
+      await supabase
+        .from("user_profiles")
+        .update(downgradePatch(now))
+        .eq("user_id", user.id);
+      await supabase
+        .from("subscriptions")
+        .update({ status: "expired", auto_renew: false, updated_at: now.toISOString() })
+        .eq("user_id", user.id);
+    }
+
     // Get subscription record if exists
     const { data: subscription } = await supabase
       .from("subscriptions")
@@ -32,10 +47,14 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     return NextResponse.json({
-      tier: profile.subscription_tier,
-      status: profile.subscription_status,
-      started_at: profile.subscription_started_at,
-      ends_at: profile.subscription_ends_at,
+      tier: state.tier,
+      status: state.status,
+      started_at: state.started_at,
+      ends_at: state.ends_at,
+      is_active: state.is_active,
+      is_expired: state.is_expired,
+      days_remaining: state.days_remaining,
+      expiring_soon: state.expiring_soon,
       subscription: subscription ?? null,
     });
   } catch (error) {

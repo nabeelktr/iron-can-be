@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthAPI, isAuthError } from "@/lib/auth/require-auth-api";
+import { signPaymentId } from "@/lib/subscription";
 
 // POST /api/payment/order — create a payment order for subscription
 export async function POST(request: NextRequest) {
@@ -62,6 +63,9 @@ export async function POST(request: NextRequest) {
       amount: String(amount_paise),
       email: profile?.email || "",
       name: profile?.display_name || "",
+      // Signature the verify endpoint requires back — proves the verify call
+      // originates from an order this server actually created.
+      sig: signPaymentId(payment.id),
     });
 
     const checkout_url = `${baseUrl}/checkout?${checkoutParams.toString()}`;

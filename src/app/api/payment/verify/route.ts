@@ -1,18 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { verifyPaymentSignature } from "@/lib/subscription";
 
 // POST /api/payment/verify — verify and complete a payment
-// Called from the checkout page after payment is confirmed
+// Called from the checkout page after payment is confirmed.
+//
+// The checkout page runs in an unauthenticated browser, so access is gated by
+// the server-issued HMAC signature (`sig`) minted by /api/payment/order rather
+// than by a user session.
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const body = await request.json();
-    const { payment_id, transaction_id } = body;
+    const { payment_id, transaction_id, sig } = body;
 
     if (!payment_id) {
       return NextResponse.json(
         { error: "payment_id is required" },
         { status: 400 },
+      );
+    }
+
+    if (!verifyPaymentSignature(payment_id, sig)) {
+      return NextResponse.json(
+        { error: "Invalid or missing payment signature" },
+        { status: 401 },
       );
     }
 

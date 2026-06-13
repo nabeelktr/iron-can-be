@@ -10,6 +10,7 @@ function CheckoutContent() {
   const amount = searchParams.get("amount");
   const email = searchParams.get("email");
   const name = searchParams.get("name");
+  const sig = searchParams.get("sig");
 
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
@@ -32,6 +33,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           payment_id: paymentId,
           transaction_id: `web_${Date.now()}`,
+          sig,
         }),
       });
 
