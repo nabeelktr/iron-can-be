@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
+    const isTemplate = searchParams.get("is_template");
 
     let query = supabase
       .from("diet_plans")
@@ -19,6 +20,12 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       query = query.ilike("name", `%${search}%`);
+    }
+
+    if (isTemplate === "true") {
+      query = query.eq("is_template", true);
+    } else if (isTemplate === "false") {
+      query = query.eq("is_template", false);
     }
 
     const { data: plans, error } = await query;
@@ -41,13 +48,14 @@ export async function POST(request: NextRequest) {
     const { supabase, user } = auth;
 
     const body = await request.json();
-    const { name, description, target_calories, target_protein, target_carbs, target_fat, num_days, days } = body;
+    const { name, description, target_calories, target_protein, target_carbs, target_fat, num_days, days, is_template, is_public } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Plan name is required" }, { status: 400 });
     }
 
-    // Create the plan
+    // Create the plan. A public template is a global template available to all
+    // users; mark it as a template implicitly when published publicly.
     const { data: plan, error: planError } = await supabase
       .from("diet_plans")
       .insert({
@@ -59,6 +67,8 @@ export async function POST(request: NextRequest) {
         target_carbs: target_carbs || null,
         target_fat: target_fat || null,
         num_days: num_days || 7,
+        is_template: is_template === true || is_public === true,
+        is_public: is_public === true,
       })
       .select("id")
       .single();

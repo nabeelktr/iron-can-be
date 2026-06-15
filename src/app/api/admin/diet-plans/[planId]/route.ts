@@ -96,6 +96,8 @@ export async function PUT(
       "target_carbs",
       "target_fat",
       "num_days",
+      "is_template",
+      "is_public",
     ];
 
     const updates: Record<string, unknown> = {
@@ -105,6 +107,11 @@ export async function PUT(
       if (body[field] !== undefined) {
         updates[field] = body[field];
       }
+    }
+
+    // Keep template/public flags consistent: a public plan is always a template.
+    if (body.is_public === true) {
+      updates.is_template = true;
     }
 
     const { error: updateError } = await supabase
