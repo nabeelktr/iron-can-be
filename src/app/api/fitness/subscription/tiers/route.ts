@@ -15,7 +15,6 @@ const TIERS = [
       { id: "progress_analytics", name: "Progress Analytics", included: true },
       { id: "diet_tracking", name: "Diet Tracking", included: false },
       { id: "trainer_support", name: "Trainer Support", included: false },
-      { id: "manual_diet_add", name: "Manual Diet Entry", included: false },
     ],
   },
   {
@@ -31,7 +30,6 @@ const TIERS = [
       { id: "progress_analytics", name: "Progress Analytics", included: true },
       { id: "diet_tracking", name: "Diet Tracking", included: true },
       { id: "trainer_support", name: "Trainer Support", included: true },
-      { id: "manual_diet_add", name: "Manual Diet Entry", included: true },
     ],
   },
 ];

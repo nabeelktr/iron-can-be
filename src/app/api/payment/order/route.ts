@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthAPI, isAuthError } from "@/lib/auth/require-auth-api";
-import { signPaymentId } from "@/lib/subscription";
+import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/razorpay";
 
-// POST /api/payment/order — create a payment order for subscription
+// POST /api/payment/order — create a Razorpay order for an in-app subscription
+// purchase. The app opens Razorpay's native checkout with the returned order.
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuthAPI(request);
@@ -20,8 +21,9 @@ export async function POST(request: NextRequest) {
     }
 
     const amount_paise = tier === "premium" ? 20000 : 13000;
+    const currency = "INR";
 
-    // Get user profile
+    // Get user profile (for checkout prefill)
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("email, display_name")
@@ -38,11 +40,11 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         amount_paise,
-        currency: "INR",
+        currency,
         tier,
         billing_period_start: now.toISOString().split("T")[0],
         billing_period_end: billingEnd.toISOString().split("T")[0],
-        payment_gateway: "website",
+        payment_gateway: "razorpay",
         status: "pending",
       })
       .select()
@@ -51,30 +53,36 @@ export async function POST(request: NextRequest) {
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Build checkout URL (hosted on this same Next.js app)
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      request.headers.get("origin") ||
-      "https://iron-can-be.vercel.app";
+    // Create the matching Razorpay order and persist its id on the payment row.
+    let order;
+    try {
+      order = await createRazorpayOrder({
+        amountPaise: amount_paise,
+        currency,
+        receipt: payment.id,
+        notes: { user_id: user.id, tier },
+      });
+    } catch (e) {
+      // Roll back the dangling pending payment if Razorpay rejected the order.
+      await supabase.from("payments").delete().eq("id", payment.id);
+      const message = e instanceof Error ? e.message : "Razorpay error";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
 
-    const checkoutParams = new URLSearchParams({
-      payment_id: payment.id,
-      tier,
-      amount: String(amount_paise),
-      email: profile?.email || "",
-      name: profile?.display_name || "",
-      // Signature the verify endpoint requires back — proves the verify call
-      // originates from an order this server actually created.
-      sig: signPaymentId(payment.id),
-    });
-
-    const checkout_url = `${baseUrl}/checkout?${checkoutParams.toString()}`;
+    await supabase
+      .from("payments")
+      .update({ order_id: order.id })
+      .eq("id", payment.id);
 
     return NextResponse.json({
       payment_id: payment.id,
-      checkout_url,
+      razorpay_order_id: order.id,
+      razorpay_key_id: getRazorpayKeyId(),
       amount_paise,
+      currency,
       tier,
+      name: profile?.display_name || "",
+      email: profile?.email || "",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

@@ -1,52 +1,63 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-import { verifyPaymentSignature } from "@/lib/subscription";
+import { requireAuthAPI, isAuthError } from "@/lib/auth/require-auth-api";
+import { verifyRazorpaySignature } from "@/lib/razorpay";
 
-// POST /api/payment/verify — verify and complete a payment
-// Called from the checkout page after payment is confirmed.
-//
-// The checkout page runs in an unauthenticated browser, so access is gated by
-// the server-issued HMAC signature (`sig`) minted by /api/payment/order rather
-// than by a user session.
+// POST /api/payment/verify — verify a completed Razorpay payment and activate
+// the subscription. Called by the app (authenticated) after the native
+// checkout returns. Security rests on two checks:
+//   1. The Razorpay signature (HMAC with our key secret) is valid.
+//   2. The order belongs to the authenticated user.
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const body = await request.json();
-    const { payment_id, transaction_id, sig } = body;
+    const auth = await requireAuthAPI(request);
+    if (isAuthError(auth)) return auth;
+    const { supabase, user } = auth;
 
-    if (!payment_id) {
+    const body = await request.json();
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = body;
+
+    if (!razorpay_payment_id || !razorpay_order_id) {
       return NextResponse.json(
-        { error: "payment_id is required" },
+        { error: "razorpay_payment_id and razorpay_order_id are required" },
         { status: 400 },
       );
     }
 
-    if (!verifyPaymentSignature(payment_id, sig)) {
+    if (
+      !verifyRazorpaySignature({
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+      })
+    ) {
       return NextResponse.json(
-        { error: "Invalid or missing payment signature" },
+        { error: "Invalid payment signature" },
         { status: 401 },
       );
     }
 
-    // Fetch the payment record
+    // Resolve our payment record from the Razorpay order id.
     const { data: payment, error: fetchError } = await supabase
       .from("payments")
       .select("*")
-      .eq("id", payment_id)
+      .eq("order_id", razorpay_order_id)
       .single();
 
     if (fetchError || !payment) {
-      return NextResponse.json(
-        { error: "Payment not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    }
+
+    // The order must belong to the caller.
+    if (payment.user_id !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (payment.status === "completed") {
-      return NextResponse.json(
-        { error: "Payment already completed" },
-        { status: 400 },
-      );
+      return NextResponse.json({
+        success: true,
+        tier: payment.tier,
+        message: "Payment already completed",
+      });
     }
 
     const now = new Date().toISOString();
@@ -56,16 +67,13 @@ export async function POST(request: NextRequest) {
       .from("payments")
       .update({
         status: "completed",
-        transaction_id: transaction_id || `manual_${Date.now()}`,
+        transaction_id: razorpay_payment_id,
         updated_at: now,
       })
-      .eq("id", payment_id);
+      .eq("id", payment.id);
 
     if (updateError)
-      return NextResponse.json(
-        { error: updateError.message },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
 
     // Update user's subscription tier and status
     await supabase

@@ -16,7 +16,37 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (!profile?.assigned_trainer_id) {
-      return NextResponse.json({ trainer: null });
+      // No trainer assigned yet — surface any pending request so the client can
+      // show an "awaiting approval" state instead of the search box.
+      const { data: pending } = await supabase
+        .from("upgrade_requests")
+        .select("id, requested_trainer_id, status, created_at")
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .not("requested_trainer_id", "is", null)
+        .order("created_at", { ascending: false })
+        .maybeSingle();
+
+      let pendingRequest = null;
+      if (pending?.requested_trainer_id) {
+        const { data: reqTrainer } = await supabase
+          .from("user_profiles")
+          .select("id, display_name, email")
+          .eq("id", pending.requested_trainer_id)
+          .maybeSingle();
+        pendingRequest = {
+          id: pending.id,
+          status: pending.status,
+          created_at: pending.created_at,
+          trainer: reqTrainer ?? null,
+        };
+      }
+
+      return NextResponse.json({
+        trainer: null,
+        relationship: null,
+        pending_request: pendingRequest,
+      });
     }
 
     // Fetch trainer profile
@@ -38,6 +68,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       trainer: trainer ?? null,
       relationship: relationship ?? null,
+      pending_request: null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

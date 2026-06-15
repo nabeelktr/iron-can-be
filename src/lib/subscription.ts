@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from "crypto";
-
 /** Number of days before expiry that the client should start warning the user. */
 export const EXPIRY_WARNING_DAYS = 7;
 
@@ -94,39 +92,4 @@ export function downgradePatch(now: Date = new Date()) {
     subscription_status: "expired" as const,
     updated_at: now.toISOString(),
   };
-}
-
-// ─── Payment signing ─────────────────────────────────────────────────────────
-//
-// There is no real payment gateway wired up yet, so `/api/payment/verify` is
-// callable from an unauthenticated browser (the externally-opened checkout
-// page). To stop arbitrary callers from completing payments they did not
-// initiate, the order endpoint signs the payment id with a server-only secret
-// and the verify endpoint requires that signature back.
-
-function signingSecret(): string {
-  return (
-    process.env.PAYMENT_SIGNING_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    "ironcan-dev-payment-secret"
-  );
-}
-
-/** HMAC-SHA256 of the payment id, used to authenticate verify calls. */
-export function signPaymentId(paymentId: string): string {
-  return createHmac("sha256", signingSecret()).update(paymentId).digest("hex");
-}
-
-/** Constant-time comparison of a presented signature against the expected one. */
-export function verifyPaymentSignature(
-  paymentId: string,
-  signature: string | null | undefined,
-): boolean {
-  if (!signature) return false;
-  const expected = signPaymentId(paymentId);
-  const a = Buffer.from(expected);
-  const b = Buffer.from(signature);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
 }

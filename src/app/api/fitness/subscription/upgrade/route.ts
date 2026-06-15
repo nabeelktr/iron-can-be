@@ -25,7 +25,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (profile.subscription_tier === "premium") {
+    // A pure tier upgrade (no trainer requested) is pointless for premium users.
+    // But premium users CAN still request a specific trainer, so only block the
+    // no-trainer case here.
+    if (profile.subscription_tier === "premium" && !trainer_id) {
       return NextResponse.json(
         { error: "Already on premium tier" },
         { status: 400 },
